@@ -10,12 +10,7 @@ output "instance_id" {
 
 output "ssh_command" {
   description = "SSH command to connect to the instance"
-  value       = "ssh opc@${oci_core_instance.mtproxy.public_ip}"
-}
-
-output "mtproxy_info_command" {
-  description = "Command to get MTProxy connection details (run on the server)"
-  value       = "/opt/mtproxy/show-connection.sh"
+  value       = "ssh ubuntu@${oci_core_instance.mtproxy.public_ip}"
 }
 
 output "mtproxy_port" {

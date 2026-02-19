@@ -3,11 +3,11 @@ resource "random_bytes" "mtproxy_secret" {
   length = 16
 }
 
-# Get latest Oracle Linux 8 image
-data "oci_core_images" "oracle_linux" {
+# Get latest Ubuntu 22.04 Minimal image
+data "oci_core_images" "ubuntu" {
   compartment_id           = var.compartment_ocid
-  operating_system         = "Oracle Linux"
-  operating_system_version = "8"
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04 Minimal"
   shape                    = var.instance_shape
   sort_by                  = "TIMECREATED"
   sort_order               = "DESC"
@@ -36,7 +36,7 @@ resource "oci_core_instance" "mtproxy" {
 
   source_details {
     source_type = "image"
-    source_id   = data.oci_core_images.oracle_linux.images[0].id
+    source_id   = data.oci_core_images.ubuntu.images[0].id
   }
 
   create_vnic_details {
