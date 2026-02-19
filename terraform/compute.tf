@@ -48,8 +48,9 @@ resource "oci_core_instance" "mtproxy" {
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
-      mtproxy_port   = var.mtproxy_port
-      mtproxy_secret = random_bytes.mtproxy_secret.hex
+      mtproxy_port       = var.mtproxy_port
+      mtproxy_secret     = random_bytes.mtproxy_secret.hex
+      fake_tls_domain    = var.mtproxy_fake_tls_domain
     }))
   }
 

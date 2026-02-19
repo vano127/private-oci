@@ -4,8 +4,24 @@ package_update: true
 
 packages:
   - docker.io
+  - xxd
 
 runcmd:
   - systemctl enable docker
   - systemctl start docker
-  - docker run -d --name mtproxy --restart always -p ${mtproxy_port}:443 -e SECRET=${mtproxy_secret} telegrammessenger/proxy
+  # Generate fake-TLS secret and start MTProxy
+  # Fake-TLS disguises traffic as HTTPS to bypass ISP throttling
+  - |
+    BASE_SECRET="${mtproxy_secret}"
+    DOMAIN="${fake_tls_domain}"
+    DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d '\n')
+    FAKE_TLS_SECRET="ee$${BASE_SECRET}$${DOMAIN_HEX}"
+
+    echo "Starting MTProxy with fake-TLS"
+    echo "Domain: $DOMAIN"
+    echo "Secret: $FAKE_TLS_SECRET"
+
+    # nineseconds/mtg v2 with fake-TLS secret
+    docker run -d --name mtproxy --restart always \
+      -p ${mtproxy_port}:3128 \
+      nineseconds/mtg:2 simple-run 0.0.0.0:3128 "$FAKE_TLS_SECRET"

@@ -65,3 +65,9 @@ variable "mtproxy_port" {
   type        = number
   default     = 443
 }
+
+variable "mtproxy_fake_tls_domain" {
+  description = "Domain to impersonate for fake-TLS (helps bypass throttling)"
+  type        = string
+  default     = "www.google.com"
+}
