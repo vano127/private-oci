@@ -1,0 +1,19 @@
+# IDE
+.idea/
+*.iml
+
+# Certificates
+*.crt
+*.pem
+*.key
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+backend.conf
+
+# OS
+.DS_Store
