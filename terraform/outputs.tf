@@ -18,8 +18,8 @@ locals {
 }
 
 output "instance_public_ip" {
-  description = "Public IP of the MTProxy instance"
-  value       = oci_core_instance.mtproxy.public_ip
+  description = "Reserved public IP of the MTProxy instance (static)"
+  value       = oci_core_public_ip.mtproxy_reserved_ip.ip_address
 }
 
 output "instance_id" {
@@ -29,7 +29,7 @@ output "instance_id" {
 
 output "ssh_command" {
   description = "SSH command to connect to the instance"
-  value       = "ssh ubuntu@${oci_core_instance.mtproxy.public_ip}"
+  value       = "ssh ubuntu@${oci_core_public_ip.mtproxy_reserved_ip.ip_address}"
 }
 
 output "mtproxy_port" {
@@ -56,6 +56,6 @@ output "fake_tls_domain" {
 
 output "telegram_proxy_link" {
   description = "Telegram proxy link with fake-TLS - use this in Telegram"
-  value       = "https://t.me/proxy?server=${oci_core_instance.mtproxy.public_ip}&port=${var.mtproxy_port}&secret=${local.fake_tls_secret}"
+  value       = "https://t.me/proxy?server=${oci_core_public_ip.mtproxy_reserved_ip.ip_address}&port=${var.mtproxy_port}&secret=${local.fake_tls_secret}"
   sensitive   = true
 }

@@ -41,7 +41,7 @@ resource "oci_core_instance" "mtproxy" {
 
   create_vnic_details {
     subnet_id        = oci_core_subnet.mtproxy_subnet.id
-    assign_public_ip = true
+    assign_public_ip = false  # Using reserved IP instead
     display_name     = "mtproxy-vnic"
   }
 
@@ -53,6 +53,34 @@ resource "oci_core_instance" "mtproxy" {
       fake_tls_domain    = var.mtproxy_fake_tls_domain
     }))
   }
+
+  freeform_tags = {
+    "Purpose" = "MTProxy"
+  }
+}
+
+# Get instance VNIC attachment
+data "oci_core_vnic_attachments" "mtproxy_vnic_attachments" {
+  compartment_id = var.compartment_ocid
+  instance_id    = oci_core_instance.mtproxy.id
+}
+
+# Get VNIC details
+data "oci_core_vnic" "mtproxy_vnic" {
+  vnic_id = data.oci_core_vnic_attachments.mtproxy_vnic_attachments.vnic_attachments[0].vnic_id
+}
+
+# Get private IP
+data "oci_core_private_ips" "mtproxy_private_ip" {
+  vnic_id = data.oci_core_vnic.mtproxy_vnic.id
+}
+
+# Reserved public IP (static, persists across instance recreates)
+resource "oci_core_public_ip" "mtproxy_reserved_ip" {
+  compartment_id = var.compartment_ocid
+  display_name   = "mtproxy-reserved-ip"
+  lifetime       = "RESERVED"
+  private_ip_id  = data.oci_core_private_ips.mtproxy_private_ip.private_ips[0].id
 
   freeform_tags = {
     "Purpose" = "MTProxy"
