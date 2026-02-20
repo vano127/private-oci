@@ -14,37 +14,31 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 - **Cloud Provider**: Oracle Cloud Infrastructure (OCI) Free Tier
 - **Instance Shape**: VM.Standard.E2.1.Micro (1 OCPU, 1GB RAM)
 - **OS**: Ubuntu 22.04 Minimal (chosen for low memory footprint ~200MB vs Oracle Linux ~400MB)
-- **Region**: eu-frankfurt-1
+- **Region**: eu-frankfurt-1 (Frankfurt - Free Tier home region)
 - **Static IP**: Reserved public IP (persists across instance recreates)
 
 ## Current MTProxy Configuration
 
-- **IP**: 158.180.25.234 (reserved/static)
-- **Domain**: bart.dnslist.site (custom domain pointing to IP)
+- **Region**: eu-frankfurt-1 (Frankfurt)
+- **IP**: See `terraform output instance_public_ip`
 - **Port**: 443
-- **Fake-TLS Domain**: bart.dnslist.site (SNI matches IP - better DPI evasion)
+- **Fake-TLS Domain**: yandex.ru (major Russian service, cannot be blocked without collateral damage)
 - **Docker Image**: nineseconds/mtg:2
 - **Mode**: Config file with anti-replay protection
 - **Secret Format**: `ee` + 16-byte-hex-secret + hex-encoded-domain
-- **Base Secret**: `fe9270abb78607fb38eb6e15bd048d6a`
+- **Base Secret**: `18a9551e3b2c78529e8d6653865fe9a0`
 
-### Telegram Proxy Links
-
-**Primary (domain-based):**
+### Telegram Proxy Link
 ```
-https://t.me/proxy?server=bart.dnslist.site&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a626172742e646e736c6973742e73697465
-```
-
-**Backup (IP-based):**
-```
-https://t.me/proxy?server=158.180.25.234&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a626172742e646e736c6973742e73697465
+# Get current link:
+cd terraform && terraform output -raw telegram_proxy_link
 ```
 
 ### Features Enabled
-- **Fake-TLS**: Disguises traffic as HTTPS to bart.dnslist.site
-- **SNI/IP Match**: Custom domain resolves to proxy IP (better DPI evasion)
+- **Fake-TLS**: Disguises traffic as HTTPS to cdn.jsdelivr.net
 - **Anti-replay**: Blocks DPI probe replay attacks (1MB bloom filter cache)
-- **Timeouts**: 30s TCP/HTTP, 1m idle
+- **DC Fallback**: Enabled for better connectivity
+- **Timeouts**: 30s TCP/HTTP, 5m idle
 
 ---
 
@@ -59,25 +53,25 @@ Russian ISPs cannot block these without massive collateral damage.
 
 | Domain | Why It's Good | Proxy Link |
 |--------|---------------|------------|
-| `vk.com` | Major Russian social network | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a766b2e636f6d` |
-| `yandex.ru` | Russian search/services | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a79616e6465782e7275` |
-| `ok.ru` | Russian social network | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a6f6b2e7275` |
+| `vk.com` | Major Russian social network | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a0766b2e636f6d` |
+| `yandex.ru` | Russian search/services | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a079616e6465782e7275` |
+| `ok.ru` | Russian social network | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a06f6b2e7275` |
 
 #### Tier 2: International CDNs
 Less commonly used for proxy fronting.
 
 | Domain | Why It's Good | Proxy Link |
 |--------|---------------|------------|
-| `cdn.jsdelivr.net` | Used by many websites | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a63646e2e6a7364656c6976722e6e6574` |
-| `storage.googleapis.com` | Google Cloud storage | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a73746f726167652e676f6f676c65617069732e636f6d` |
+| `cdn.jsdelivr.net` | Used by many websites | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a063646e2e6a7364656c6976722e6e6574` |
+| `storage.googleapis.com` | Google Cloud storage | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a073746f726167652e676f6f676c65617069732e636f6d` |
 
 #### Tier 3: Common (May Be Fingerprinted)
 
 | Domain | Risk Level | Proxy Link |
 |--------|------------|------------|
-| `www.microsoft.com` | Medium (current) | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a7777772e6d6963726f736f66742e636f6d` |
-| `www.google.com` | High (common target) | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a7777772e676f6f676c652e636f6d` |
-| `cloudflare.com` | High (very common) | `https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a636c6f7564666c6172652e636f6d` |
+| `www.microsoft.com` | Medium (current) | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a07777772e6d6963726f736f66742e636f6d` |
+| `www.google.com` | High (common target) | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a07777772e676f6f676c652e636f6d` |
+| `cloudflare.com` | High (very common) | `https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a0636c6f7564666c6172652e636f6d` |
 
 #### Domain Selection Criteria
 - Must support TLS 1.3
@@ -91,7 +85,7 @@ Less commonly used for proxy fronting.
 ./scripts/bastion-setup.sh exec "sudo docker stop mtproxy && sudo docker rm mtproxy"
 
 # Start with new domain (example: vk.com)
-./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always -p 443:3128 nineseconds/mtg:2 simple-run -d -t 30s 0.0.0.0:3128 "eefe9270abb78607fb38eb6e15bd048d6a766b2e636f6d"'
+./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always -p 443:3128 nineseconds/mtg:2 simple-run -d -t 30s 0.0.0.0:3128 "ee18a9551e3b2c78529e8d6653865fe9a0766b2e636f6d"'
 ```
 
 ---
@@ -111,7 +105,7 @@ Create config file on instance:
 ```bash
 ./scripts/bastion-setup.sh exec 'cat > /home/ubuntu/mtg-config.toml << EOF
 debug = true
-secret = "eefe9270abb78607fb38eb6e15bd048d6a7777772e6d6963726f736f66742e636f6d"
+secret = "ee18a9551e3b2c78529e8d6653865fe9a07777772e6d6963726f736f66742e636f6d"
 bind-to = "0.0.0.0:3128"
 
 [defense.anti-replay]
@@ -159,7 +153,7 @@ update-each = "24h"
 ```bash
 ./scripts/bastion-setup.sh exec 'cat > /home/ubuntu/mtg-config.toml << EOF
 debug = true
-secret = "eefe9270abb78607fb38eb6e15bd048d6a7777772e6d6963726f736f66742e636f6d"
+secret = "ee18a9551e3b2c78529e8d6653865fe9a07777772e6d6963726f736f66742e636f6d"
 bind-to = "0.0.0.0:3128"
 domain-fronting-port = 443
 tolerate-time-skewness = "5s"
@@ -218,7 +212,7 @@ If fake-TLS is being detected, try switching to official MTProxy with `dd` paddi
 
 # Generate dd-prefixed secret
 # dd + base_secret (no domain encoding needed)
-# Example: ddfe9270abb78607fb38eb6e15bd048d6a
+# Example: dd18a9551e3b2c78529e8d6653865fe9a0
 
 # Run official MTProxy with dd padding
 ./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always \
@@ -241,13 +235,13 @@ If fake-TLS is being detected, try switching to official MTProxy with `dd` paddi
   -p 443:443 \
   -v /home/ubuntu/proxy-secret:/data/proxy-secret:ro \
   -v /home/ubuntu/proxy-multi.conf:/data/proxy-multi.conf:ro \
-  -e SECRET=ddfe9270abb78607fb38eb6e15bd048d6a \
+  -e SECRET=dd18a9551e3b2c78529e8d6653865fe9a0 \
   telegrammessenger/proxy:latest'
 ```
 
 **Telegram proxy link with dd padding:**
 ```
-https://t.me/proxy?server=138.2.146.96&port=443&secret=ddfe9270abb78607fb38eb6e15bd048d6a
+https://t.me/proxy?server=92.5.20.109&port=443&secret=dd18a9551e3b2c78529e8d6653865fe9a0
 ```
 
 #### Comparison: `dd` vs `ee` Modes
@@ -271,11 +265,11 @@ Current fake-TLS setup has a detectable weakness:
 ```
 Client sends TLS handshake:
   SNI (Server Name): cdn.jsdelivr.net
-  Destination IP: 138.2.146.96
+  Destination IP: 92.5.20.109
 
 DPI can check:
   DNS lookup cdn.jsdelivr.net → 104.16.x.x (Cloudflare)
-  Actual connection IP → 138.2.146.96 (OCI)
+  Actual connection IP → 92.5.20.109 (OCI)
   MISMATCH → Potential proxy detected
 ```
 
@@ -300,7 +294,7 @@ Add an A record pointing to your OCI IP:
 ```
 Type: A
 Name: @ (or www, or cdn)
-Value: 138.2.146.96
+Value: 92.5.20.109
 TTL: 300
 ```
 
@@ -311,7 +305,7 @@ TTL: 300
 ./scripts/bastion-setup.sh exec "sudo docker stop mtproxy && sudo docker rm mtproxy"
 
 # Calculate new secret with your domain
-./scripts/bastion-setup.sh exec 'DOMAIN="yourdomain.xyz"; DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\n"); echo "eefe9270abb78607fb38eb6e15bd048d6a$DOMAIN_HEX"'
+./scripts/bastion-setup.sh exec 'DOMAIN="yourdomain.xyz"; DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\n"); echo "ee18a9551e3b2c78529e8d6653865fe9a0$DOMAIN_HEX"'
 
 # Update config file
 ./scripts/bastion-setup.sh exec 'cat > /home/ubuntu/mtg-config.toml << EOF
@@ -462,7 +456,7 @@ To change the domain without recreating the instance:
 ./scripts/bastion-setup.sh exec "sudo docker stop mtproxy && sudo docker rm mtproxy"
 
 # Calculate new secret (example for vk.com)
-./scripts/bastion-setup.sh exec 'DOMAIN="vk.com"; DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\n"); echo "eefe9270abb78607fb38eb6e15bd048d6a$DOMAIN_HEX"'
+./scripts/bastion-setup.sh exec 'DOMAIN="vk.com"; DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\n"); echo "ee18a9551e3b2c78529e8d6653865fe9a0$DOMAIN_HEX"'
 
 # Start with new secret
 ./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always -p 443:3128 nineseconds/mtg:2 simple-run -d -t 30s 0.0.0.0:3128 "<SECRET_FROM_ABOVE>"'

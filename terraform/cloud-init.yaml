@@ -21,23 +21,32 @@ runcmd:
     echo "Domain: $DOMAIN"
     echo "Secret: $FAKE_TLS_SECRET"
 
-    # Create mtg config file with anti-replay protection
+    # Create mtg config file with anti-replay protection and optimized settings
     cat > /home/ubuntu/mtg-config.toml << EOF
     debug = true
     secret = "$FAKE_TLS_SECRET"
     bind-to = "0.0.0.0:3128"
     domain-fronting-port = 443
     tolerate-time-skewness = "5s"
+    allow-fallback-on-unknown-dc = true
 
     [defense.anti-replay]
     enabled = true
     max-size = "1mib"
     error-rate = 0.001
 
+    [defense.blocklist]
+    enabled = true
+    download-concurrency = 2
+    urls = [
+        "https://iplists.firehol.org/files/firehol_level1.netset"
+    ]
+    update-each = "24h"
+
     [network.timeout]
     tcp = "30s"
     http = "30s"
-    idle = "1m"
+    idle = "5m"
     EOF
 
     # nineseconds/mtg v2 with config file
