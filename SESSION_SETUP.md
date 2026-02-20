@@ -22,7 +22,7 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 - **Region**: eu-frankfurt-1 (Frankfurt)
 - **IP**: See `terraform output instance_public_ip`
 - **Port**: 443
-- **Fake-TLS Domain**: yandex.ru (major Russian service, cannot be blocked without collateral damage)
+- **Fake-TLS Domain**: cdn.jsdelivr.net (well-known CDN, high traffic volume)
 - **Docker Image**: nineseconds/mtg:2
 - **Mode**: Config file with anti-replay protection
 - **Secret Format**: `ee` + 16-byte-hex-secret + hex-encoded-domain
