@@ -568,6 +568,42 @@ scripts/
 └── bastion-setup.sh      # Helper script for SSH via K8s bastion
 ```
 
+## Monitoring Proxy Statistics
+
+### Check Active Connections
+```bash
+./scripts/bastion-setup.sh exec "ss -tn state established '( sport = :443 )' | tail -n +2 | wc -l"
+```
+
+### Check Connection Statistics
+```bash
+# Failed handshakes (blocked probes/scanners)
+./scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep -c "handshake is failed"'
+
+# Successful streams
+./scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep -c "Stream has been started"'
+
+# Unique client IPs with connection counts
+./scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep "client-ip" | grep -oP "client-ip\":\"[0-9.]+\"" | sort | uniq -c | sort -rn'
+```
+
+### What Gets Blocked
+
+| Protection | What It Blocks |
+|------------|----------------|
+| Anti-replay | DPI probes replaying captured handshakes |
+| IP Blocklist | Known scanners/attackers (FireHOL list ~40k IPs) |
+| Invalid handshake | Scanners sending non-MTProxy traffic |
+
+### Example Statistics (2025-02-19)
+| Metric | Count |
+|--------|-------|
+| Successful streams | 2,216 |
+| Failed handshakes (blocked) | 8 |
+| Unique client IPs | 2 |
+
+---
+
 ## Troubleshooting
 
 ### Cloud-init not completing
