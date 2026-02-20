@@ -19,21 +19,30 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 
 ## Current MTProxy Configuration
 
-- **IP**: 138.2.146.96 (reserved/static)
+- **IP**: 158.180.25.234 (reserved/static)
+- **Domain**: bart.dnslist.site (custom domain pointing to IP)
 - **Port**: 443
-- **Fake-TLS Domain**: cdn.jsdelivr.net (CDN traffic, less fingerprinted)
+- **Fake-TLS Domain**: bart.dnslist.site (SNI matches IP - better DPI evasion)
 - **Docker Image**: nineseconds/mtg:2
 - **Mode**: Config file with anti-replay protection
 - **Secret Format**: `ee` + 16-byte-hex-secret + hex-encoded-domain
 - **Base Secret**: `fe9270abb78607fb38eb6e15bd048d6a`
 
-### Telegram Proxy Link
+### Telegram Proxy Links
+
+**Primary (domain-based):**
 ```
-https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a63646e2e6a7364656c6976722e6e6574
+https://t.me/proxy?server=bart.dnslist.site&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a626172742e646e736c6973742e73697465
+```
+
+**Backup (IP-based):**
+```
+https://t.me/proxy?server=158.180.25.234&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a626172742e646e736c6973742e73697465
 ```
 
 ### Features Enabled
-- **Fake-TLS**: Disguises traffic as HTTPS to cdn.jsdelivr.net
+- **Fake-TLS**: Disguises traffic as HTTPS to bart.dnslist.site
+- **SNI/IP Match**: Custom domain resolves to proxy IP (better DPI evasion)
 - **Anti-replay**: Blocks DPI probe replay attacks (1MB bloom filter cache)
 - **Timeouts**: 30s TCP/HTTP, 1m idle
 
