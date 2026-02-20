@@ -21,18 +21,21 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 
 - **IP**: 138.2.146.96 (reserved/static)
 - **Port**: 443
-- **Fake-TLS Domain**: www.microsoft.com (helps bypass Russian DPI)
+- **Fake-TLS Domain**: cdn.jsdelivr.net (CDN traffic, less fingerprinted)
 - **Docker Image**: nineseconds/mtg:2
+- **Mode**: Config file with anti-replay protection
 - **Secret Format**: `ee` + 16-byte-hex-secret + hex-encoded-domain
 - **Base Secret**: `fe9270abb78607fb38eb6e15bd048d6a`
 
 ### Telegram Proxy Link
 ```
-https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a7777772e6d6963726f736f66742e636f6d
+https://t.me/proxy?server=138.2.146.96&port=443&secret=eefe9270abb78607fb38eb6e15bd048d6a63646e2e6a7364656c6976722e6e6574
 ```
 
-### Why Fake-TLS?
-Russian ISPs use DPI (Deep Packet Inspection) to detect and throttle MTProxy traffic. Fake-TLS disguises the traffic as regular HTTPS to a legitimate domain (www.microsoft.com), making it harder to detect.
+### Features Enabled
+- **Fake-TLS**: Disguises traffic as HTTPS to cdn.jsdelivr.net
+- **Anti-replay**: Blocks DPI probe replay attacks (1MB bloom filter cache)
+- **Timeouts**: 30s TCP/HTTP, 1m idle
 
 ---
 

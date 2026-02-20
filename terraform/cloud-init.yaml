@@ -9,19 +9,39 @@ packages:
 runcmd:
   - systemctl enable docker
   - systemctl start docker
-  # Generate fake-TLS secret and start MTProxy
-  # Fake-TLS disguises traffic as HTTPS to bypass ISP throttling
+  # Generate fake-TLS secret and start MTProxy with config file mode
+  # Config file enables anti-replay protection against DPI probing
   - |
     BASE_SECRET="${mtproxy_secret}"
     DOMAIN="${fake_tls_domain}"
     DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d '\n')
     FAKE_TLS_SECRET="ee$${BASE_SECRET}$${DOMAIN_HEX}"
 
-    echo "Starting MTProxy with fake-TLS"
+    echo "Starting MTProxy with fake-TLS and anti-replay"
     echo "Domain: $DOMAIN"
     echo "Secret: $FAKE_TLS_SECRET"
 
-    # nineseconds/mtg v2 with fake-TLS secret
+    # Create mtg config file with anti-replay protection
+    cat > /home/ubuntu/mtg-config.toml << EOF
+    debug = true
+    secret = "$FAKE_TLS_SECRET"
+    bind-to = "0.0.0.0:3128"
+    domain-fronting-port = 443
+    tolerate-time-skewness = "5s"
+
+    [defense.anti-replay]
+    enabled = true
+    max-size = "1mib"
+    error-rate = 0.001
+
+    [network.timeout]
+    tcp = "30s"
+    http = "30s"
+    idle = "1m"
+    EOF
+
+    # nineseconds/mtg v2 with config file
     docker run -d --name mtproxy --restart always \
       -p ${mtproxy_port}:3128 \
-      nineseconds/mtg:2 simple-run 0.0.0.0:3128 "$FAKE_TLS_SECRET"
+      -v /home/ubuntu/mtg-config.toml:/config.toml:ro \
+      nineseconds/mtg:2 run /config.toml
