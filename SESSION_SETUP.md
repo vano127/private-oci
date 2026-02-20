@@ -69,8 +69,12 @@ terraform apply
 
 ### Recreate Instance (e.g., after cloud-init changes)
 ```bash
-terraform taint oci_core_instance.mtproxy
-terraform apply
+# Recommended: use -replace flag (single command)
+terraform apply -replace=oci_core_instance.mtproxy
+
+# Deprecated: taint + apply (two commands, taint is deprecated)
+# terraform taint oci_core_instance.mtproxy
+# terraform apply
 ```
 
 ### Get Outputs
