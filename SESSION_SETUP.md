@@ -253,7 +253,118 @@ https://t.me/proxy?server=138.2.146.96&port=443&secret=ddfe9270abb78607fb38eb6e1
 
 ---
 
-### 5. Alternative Solutions (If MTProxy Fails)
+### 5. Custom Domain for Better DPI Evasion
+
+#### The SNI/IP Mismatch Problem
+
+Current fake-TLS setup has a detectable weakness:
+
+```
+Client sends TLS handshake:
+  SNI (Server Name): cdn.jsdelivr.net
+  Destination IP: 138.2.146.96
+
+DPI can check:
+  DNS lookup cdn.jsdelivr.net → 104.16.x.x (Cloudflare)
+  Actual connection IP → 138.2.146.96 (OCI)
+  MISMATCH → Potential proxy detected
+```
+
+#### Solution: Use Your Own Domain
+
+Register a cheap domain and point it to your OCI IP. This makes SNI match the actual IP.
+
+**Cost:** ~$10/year (Namecheap, Porkbun, Cloudflare Registrar)
+
+#### Setup Steps
+
+**1. Register a Domain**
+
+Choose an innocuous-looking domain:
+- `mytechblog.xyz` (~$2/year)
+- `cloudservice-cdn.com` (~$10/year)
+- Avoid obvious names like `proxy`, `vpn`, `telegram`
+
+**2. Configure DNS**
+
+Add an A record pointing to your OCI IP:
+```
+Type: A
+Name: @ (or www, or cdn)
+Value: 138.2.146.96
+TTL: 300
+```
+
+**3. Update MTProxy Configuration**
+
+```bash
+# Stop current container
+./scripts/bastion-setup.sh exec "sudo docker stop mtproxy && sudo docker rm mtproxy"
+
+# Calculate new secret with your domain
+./scripts/bastion-setup.sh exec 'DOMAIN="yourdomain.xyz"; DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\n"); echo "eefe9270abb78607fb38eb6e15bd048d6a$DOMAIN_HEX"'
+
+# Update config file
+./scripts/bastion-setup.sh exec 'cat > /home/ubuntu/mtg-config.toml << EOF
+debug = true
+secret = "ee<YOUR_SECRET_HERE>"
+bind-to = "0.0.0.0:3128"
+domain-fronting-port = 443
+tolerate-time-skewness = "5s"
+
+[defense.anti-replay]
+enabled = true
+max-size = "1mib"
+error-rate = 0.001
+
+[network.timeout]
+tcp = "30s"
+http = "30s"
+idle = "1m"
+EOF'
+
+# Start with new config
+./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always -p 443:3128 -v /home/ubuntu/mtg-config.toml:/config.toml:ro nineseconds/mtg:2 run /config.toml'
+```
+
+**4. Update Terraform (Optional)**
+
+Update `terraform/terraform.tfvars`:
+```hcl
+mtproxy_fake_tls_domain = "yourdomain.xyz"
+```
+
+#### Comparison: With vs Without Custom Domain
+
+| Aspect | Without Custom Domain | With Custom Domain |
+|--------|----------------------|-------------------|
+| SNI/IP match | ❌ Mismatch detectable | ✅ Matches |
+| Cost | Free | ~$10/year |
+| Setup complexity | Simple | Medium |
+| Domain blocking risk | Low (using known domain) | Medium (your domain could be blocked) |
+| Probe response | Returns cdn.jsdelivr.net | Returns your domain (need web server) |
+
+#### Optional: Add a Simple Web Server
+
+To make probes return a legitimate-looking website:
+
+```bash
+# Run nginx alongside MTProxy (on port 80)
+./scripts/bastion-setup.sh exec 'sudo docker run -d --name webserver --restart always -p 80:80 nginx:alpine'
+```
+
+This way, if someone visits `http://yourdomain.xyz`, they see a default nginx page instead of connection refused.
+
+#### Security Consideration
+
+If your domain gets blocked, you lose the proxy. Mitigations:
+- Register multiple cheap domains as backups
+- Use privacy protection (WHOIS guard) when registering
+- Don't share the domain publicly
+
+---
+
+### 6. Alternative Solutions (If MTProxy Fails)
 
 If Russian DPI blocks MTProxy entirely, these alternatives provide better evasion:
 
