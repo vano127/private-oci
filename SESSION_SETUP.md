@@ -595,12 +595,15 @@ scripts/
 | IP Blocklist | Known scanners/attackers (FireHOL list ~40k IPs) |
 | Invalid handshake | Scanners sending non-MTProxy traffic |
 
-### Example Statistics (2025-02-19)
+### Example Statistics (2025-02-21, 25h uptime)
 | Metric | Count |
 |--------|-------|
-| Successful streams | 2,216 |
-| Failed handshakes (blocked) | 8 |
-| Unique client IPs | 2 |
+| Successful streams | 17,329 |
+| Failed handshakes (blocked) | 55 |
+| Bad digest (invalid secret) | 230 |
+| Unique client IPs | 94 |
+
+**Note:** Bad digest attempts are scanners trying wrong secrets - they get forwarded to real cdn.jsdelivr.net instead of exposing the proxy.
 
 ---
 
