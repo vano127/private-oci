@@ -21,9 +21,17 @@ Custom MTProxy container with environment-based configuration.
 
 ## Build Locally
 
+**Note:** The `zscaler.crt` is gitignored. Copy it before building:
+
 ```bash
-cd docker
-docker build -t mtproxy:local .
+cp /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt /Users/kmvr200/IdeaProjects/personal-oci/docker/
+```
+
+Then build:
+
+```bash
+cd /Users/kmvr200/IdeaProjects/personal-oci/docker
+podman build -t mtproxy:local .
 ```
 
 ## Run Locally

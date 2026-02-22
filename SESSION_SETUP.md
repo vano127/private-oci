@@ -262,7 +262,10 @@ terraform output -raw ocir_token
 # Start podman machine
 podman machine start
 
-# Build image (zscaler cert required for corporate proxy)
+# Copy zscaler cert (gitignored, must copy before build)
+cp /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt /Users/kmvr200/IdeaProjects/personal-oci/docker/
+
+# Build image
 cd /Users/kmvr200/IdeaProjects/personal-oci/docker
 podman build -t mtproxy:latest .
 
