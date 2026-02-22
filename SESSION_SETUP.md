@@ -47,16 +47,16 @@ Two proxy containers run on the same instance for different ISP compatibility:
 https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a063646e2e6a7364656c6976722e6e6574
 ```
 
-### Secondary Proxy (yandex.ru) - For MegaFon
+### Secondary Proxy (wildberries.ru) - For MegaFon
 - **IP**: 92.5.20.109
 - **Port**: 8443
-- **Domain**: yandex.ru (Russian service, hard to block)
+- **Domain**: wildberries.ru (major Russian e-commerce, less monitored than yandex.ru)
 - **Container**: mtproxy-secondary
 - **Config**: /home/ubuntu/mtg-config-secondary.toml
 
 **Proxy Link:**
 ```
-https://t.me/proxy?server=92.5.20.109&port=8443&secret=eec31b01336b160e5396c01c09f2c25bf679616e6465782e7275
+https://t.me/proxy?server=92.5.20.109&port=8443&secret=eec31b01336b160e5396c01c09f2c25bf677696c64626572726965732e7275
 ```
 
 ### Common Settings
