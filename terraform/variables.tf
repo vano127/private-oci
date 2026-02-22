@@ -71,3 +71,16 @@ variable "mtproxy_fake_tls_domain" {
   type        = string
   default     = "cdn.jsdelivr.net"
 }
+
+# Secondary MTProxy Variables
+variable "mtproxy_secondary_port" {
+  description = "Secondary MTProxy listening port"
+  type        = number
+  default     = 8443
+}
+
+variable "mtproxy_secondary_domain" {
+  description = "Domain for secondary proxy (less monitored Russian domain)"
+  type        = string
+  default     = "wildberries.ru"
+}

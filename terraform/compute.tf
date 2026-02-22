@@ -3,6 +3,11 @@ resource "random_bytes" "mtproxy_secret" {
   length = 16
 }
 
+# Generate Secondary MTProxy secret
+resource "random_bytes" "mtproxy_secret_secondary" {
+  length = 16
+}
+
 # Get latest Ubuntu 22.04 Minimal image
 data "oci_core_images" "ubuntu" {
   compartment_id           = var.compartment_ocid
@@ -48,9 +53,12 @@ resource "oci_core_instance" "mtproxy" {
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
-      mtproxy_port       = var.mtproxy_port
-      mtproxy_secret     = random_bytes.mtproxy_secret.hex
-      fake_tls_domain    = var.mtproxy_fake_tls_domain
+      mtproxy_port              = var.mtproxy_port
+      mtproxy_secret            = random_bytes.mtproxy_secret.hex
+      fake_tls_domain           = var.mtproxy_fake_tls_domain
+      mtproxy_port_secondary    = var.mtproxy_secondary_port
+      mtproxy_secret_secondary  = random_bytes.mtproxy_secret_secondary.hex
+      fake_tls_domain_secondary = var.mtproxy_secondary_domain
     }))
   }
 
@@ -87,5 +95,6 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
   }
 }
 
-# Note: Secondary proxy runs as a second container on the same instance
-# See SESSION_SETUP.md for manual setup instructions
+# Note: Both primary and secondary proxies run as containers on the same instance
+# Primary: port 443, cdn.jsdelivr.net
+# Secondary: port 8443, wildberries.ru (for ISPs like MegaFon)

@@ -54,3 +54,48 @@ runcmd:
       -p ${mtproxy_port}:3128 \
       -v /home/ubuntu/mtg-config.toml:/config.toml:ro \
       nineseconds/mtg:2 run /config.toml
+
+  # Secondary proxy with different domain for ISP compatibility (e.g., MegaFon)
+  - |
+    BASE_SECRET_SECONDARY="${mtproxy_secret_secondary}"
+    DOMAIN_SECONDARY="${fake_tls_domain_secondary}"
+    DOMAIN_HEX_SECONDARY=$(echo -n "$DOMAIN_SECONDARY" | xxd -p | tr -d '\n')
+    FAKE_TLS_SECRET_SECONDARY="ee$${BASE_SECRET_SECONDARY}$${DOMAIN_HEX_SECONDARY}"
+
+    echo "Starting Secondary MTProxy"
+    echo "Domain: $DOMAIN_SECONDARY"
+    echo "Port: ${mtproxy_port_secondary}"
+
+    # Create secondary mtg config file
+    cat > /home/ubuntu/mtg-config-secondary.toml << EOF
+    debug = true
+    secret = "$FAKE_TLS_SECRET_SECONDARY"
+    bind-to = "0.0.0.0:${mtproxy_port_secondary}"
+    domain-fronting-port = 443
+    tolerate-time-skewness = "5s"
+    allow-fallback-on-unknown-dc = true
+
+    [defense.anti-replay]
+    enabled = true
+    max-size = "1mib"
+    error-rate = 0.001
+
+    [defense.blocklist]
+    enabled = true
+    download-concurrency = 2
+    urls = [
+        "https://iplists.firehol.org/files/firehol_level1.netset"
+    ]
+    update-each = "24h"
+
+    [network.timeout]
+    tcp = "30s"
+    http = "30s"
+    idle = "5m"
+    EOF
+
+    # Secondary mtg container
+    docker run -d --name mtproxy-secondary --restart always \
+      -p ${mtproxy_port_secondary}:${mtproxy_port_secondary} \
+      -v /home/ubuntu/mtg-config-secondary.toml:/config.toml:ro \
+      nineseconds/mtg:2 run /config.toml

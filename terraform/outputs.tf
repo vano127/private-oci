@@ -13,8 +13,13 @@ locals {
     "5" = "35", "6" = "36", "7" = "37", "8" = "38", "9" = "39",
     "." = "2e", "-" = "2d", "_" = "5f"
   }
-  domain_hex = join("", [for c in split("", var.mtproxy_fake_tls_domain) : local.ascii_hex[c]])
+  # Primary proxy secret
+  domain_hex      = join("", [for c in split("", var.mtproxy_fake_tls_domain) : local.ascii_hex[c]])
   fake_tls_secret = "ee${random_bytes.mtproxy_secret.hex}${local.domain_hex}"
+
+  # Secondary proxy secret
+  domain_hex_secondary      = join("", [for c in split("", var.mtproxy_secondary_domain) : local.ascii_hex[c]])
+  fake_tls_secret_secondary = "ee${random_bytes.mtproxy_secret_secondary.hex}${local.domain_hex_secondary}"
 }
 
 output "instance_public_ip" {
@@ -60,5 +65,25 @@ output "telegram_proxy_link" {
   sensitive   = true
 }
 
-# Note: Secondary proxy (yandex.ru on port 8443) runs as a container on the same instance
-# Secret is manually generated - see SESSION_SETUP.md
+# Secondary proxy outputs
+output "mtproxy_secondary_port" {
+  description = "Secondary MTProxy listening port"
+  value       = var.mtproxy_secondary_port
+}
+
+output "mtproxy_secondary_domain" {
+  description = "Domain used for secondary proxy fake-TLS"
+  value       = var.mtproxy_secondary_domain
+}
+
+output "mtproxy_secondary_secret" {
+  description = "Secondary MTProxy base secret"
+  value       = random_bytes.mtproxy_secret_secondary.hex
+  sensitive   = true
+}
+
+output "telegram_proxy_link_secondary" {
+  description = "Telegram proxy link for secondary proxy (for ISPs like MegaFon)"
+  value       = "https://t.me/proxy?server=${oci_core_public_ip.mtproxy_reserved_ip.ip_address}&port=${var.mtproxy_secondary_port}&secret=${local.fake_tls_secret_secondary}"
+  sensitive   = true
+}

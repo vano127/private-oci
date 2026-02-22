@@ -66,7 +66,7 @@ resource "oci_core_security_list" "mtproxy_sl" {
     }
   }
 
-  # Ingress - MTProxy Secondary (port 8443)
+  # Ingress - MTProxy Secondary
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "0.0.0.0/0"
@@ -74,8 +74,8 @@ resource "oci_core_security_list" "mtproxy_sl" {
     description = "MTProxy secondary access"
 
     tcp_options {
-      min = 8443
-      max = 8443
+      min = var.mtproxy_secondary_port
+      max = var.mtproxy_secondary_port
     }
   }
 }
