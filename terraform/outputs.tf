@@ -59,3 +59,6 @@ output "telegram_proxy_link" {
   value       = "https://t.me/proxy?server=${oci_core_public_ip.mtproxy_reserved_ip.ip_address}&port=${var.mtproxy_port}&secret=${local.fake_tls_secret}"
   sensitive   = true
 }
+
+# Note: Secondary proxy (yandex.ru on port 8443) runs as a container on the same instance
+# Secret is manually generated - see SESSION_SETUP.md

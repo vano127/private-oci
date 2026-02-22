@@ -19,24 +19,41 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 
 ## Current MTProxy Configuration
 
-- **Region**: eu-frankfurt-1 (Frankfurt)
-- **IP**: See `terraform output instance_public_ip`
+Two proxy containers run on the same instance for different ISP compatibility:
+
+### Primary Proxy (cdn.jsdelivr.net)
+- **IP**: 92.5.20.109
 - **Port**: 443
-- **Fake-TLS Domain**: cdn.jsdelivr.net (well-known CDN, high traffic volume)
+- **Domain**: cdn.jsdelivr.net (well-known CDN)
+- **Container**: mtproxy
+- **Config**: /home/ubuntu/mtg-config.toml
+
+**Proxy Link:**
+```
+https://t.me/proxy?server=92.5.20.109&port=443&secret=ee18a9551e3b2c78529e8d6653865fe9a063646e2e6a7364656c6976722e6e6574
+```
+
+### Secondary Proxy (yandex.ru) - For MegaFon
+- **IP**: 92.5.20.109
+- **Port**: 8443
+- **Domain**: yandex.ru (Russian service, hard to block)
+- **Container**: mtproxy-secondary
+- **Config**: /home/ubuntu/mtg-config-secondary.toml
+
+**Proxy Link:**
+```
+https://t.me/proxy?server=92.5.20.109&port=8443&secret=eec31b01336b160e5396c01c09f2c25bf679616e6465782e7275
+```
+
+### Common Settings
 - **Docker Image**: nineseconds/mtg:2
 - **Mode**: Config file with anti-replay protection
 - **Secret Format**: `ee` + 16-byte-hex-secret + hex-encoded-domain
-- **Base Secret**: `18a9551e3b2c78529e8d6653865fe9a0`
 
-### Telegram Proxy Link
-```
-# Get current link:
-cd terraform && terraform output -raw telegram_proxy_link
-```
-
-### Features Enabled
-- **Fake-TLS**: Disguises traffic as HTTPS to cdn.jsdelivr.net
+### Features Enabled (both proxies)
+- **Fake-TLS**: Disguises traffic as HTTPS
 - **Anti-replay**: Blocks DPI probe replay attacks (1MB bloom filter cache)
+- **IP Blocklist**: FireHOL level1 (~40k IPs)
 - **DC Fallback**: Enabled for better connectivity
 - **Timeouts**: 30s TCP/HTTP, 5m idle
 
@@ -462,14 +479,62 @@ To change the domain without recreating the instance:
 ./scripts/bastion-setup.sh exec 'sudo docker run -d --name mtproxy --restart always -p 443:3128 nineseconds/mtg:2 simple-run -d -t 30s 0.0.0.0:3128 "<SECRET_FROM_ABOVE>"'
 ```
 
+## Manage Secondary Proxy Container
+
+The secondary proxy (yandex.ru on port 8443) runs as a separate container:
+
+```bash
+# Check both containers
+./scripts/bastion-setup.sh exec "sudo docker ps"
+
+# View secondary logs
+./scripts/bastion-setup.sh exec "sudo docker logs --tail 50 mtproxy-secondary"
+
+# Restart secondary
+./scripts/bastion-setup.sh exec "sudo docker restart mtproxy-secondary"
+
+# Stop/remove secondary
+./scripts/bastion-setup.sh exec "sudo docker stop mtproxy-secondary && sudo docker rm mtproxy-secondary"
+
+# Recreate secondary with new secret
+./scripts/bastion-setup.sh exec 'DOMAIN="yandex.ru"; SECRET=$(openssl rand -hex 16); DOMAIN_HEX=$(echo -n "$DOMAIN" | xxd -p | tr -d "\\n"); FAKE_TLS_SECRET="ee${SECRET}${DOMAIN_HEX}"; echo "New secret: $FAKE_TLS_SECRET"; sudo tee /home/ubuntu/mtg-config-secondary.toml > /dev/null << EOF
+debug = true
+secret = "$FAKE_TLS_SECRET"
+bind-to = "0.0.0.0:8443"
+domain-fronting-port = 443
+tolerate-time-skewness = "5s"
+allow-fallback-on-unknown-dc = true
+
+[defense.anti-replay]
+enabled = true
+max-size = "1mib"
+error-rate = 0.001
+
+[defense.blocklist]
+enabled = true
+download-concurrency = 2
+urls = ["https://iplists.firehol.org/files/firehol_level1.netset"]
+update-each = "24h"
+
+[network.timeout]
+tcp = "30s"
+http = "30s"
+idle = "5m"
+EOF
+sudo docker run -d --name mtproxy-secondary --restart always -p 8443:8443 -v /home/ubuntu/mtg-config-secondary.toml:/config.toml:ro nineseconds/mtg:2 run /config.toml'
+```
+
 ## Verify MTProxy is Running
 
 ```bash
 # Check container status
 ./scripts/bastion-setup.sh exec "sudo docker ps"
 
-# Check logs
+# Check primary logs
 ./scripts/bastion-setup.sh exec "sudo docker logs --tail 50 mtproxy"
+
+# Check secondary logs
+./scripts/bastion-setup.sh exec "sudo docker logs --tail 50 mtproxy-secondary"
 
 # Check cloud-init status
 ./scripts/bastion-setup.sh exec "cloud-init status"

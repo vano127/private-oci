@@ -86,3 +86,6 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
     "Purpose" = "MTProxy"
   }
 }
+
+# Note: Secondary proxy runs as a second container on the same instance
+# See SESSION_SETUP.md for manual setup instructions
