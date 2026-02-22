@@ -8,6 +8,20 @@ This document captures all the tools and setup used to deploy MTProxy on OCI.
 - kubectl configured with access to EKS cluster
 - OCI CLI configured (for checking available images)
 - SSH key pair (`~/.ssh/id_ed25519`)
+- Zscaler certificate for HTTPS fetches (corporate network)
+
+### Zscaler Certificate
+
+For HTTPS requests through corporate proxy, use the zscaler certificate:
+
+```bash
+# Curl with zscaler cert
+curl --cacert /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt https://example.com
+
+# Or set environment variable
+export CURL_CA_BUNDLE=/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt
+export REQUESTS_CA_BUNDLE=/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt
+```
 
 ## Infrastructure Overview
 
