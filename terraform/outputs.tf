@@ -66,6 +66,11 @@ output "telegram_proxy_link" {
 }
 
 # Secondary proxy outputs
+output "instance_secondary_ip" {
+  description = "Reserved public IP for secondary proxy (static)"
+  value       = oci_core_public_ip.mtproxy_secondary_ip.ip_address
+}
+
 output "mtproxy_secondary_port" {
   description = "Secondary MTProxy listening port"
   value       = var.mtproxy_secondary_port
@@ -83,7 +88,7 @@ output "mtproxy_secondary_secret" {
 }
 
 output "telegram_proxy_link_secondary" {
-  description = "Telegram proxy link for secondary proxy (for ISPs like MegaFon)"
-  value       = "https://t.me/proxy?server=${oci_core_public_ip.mtproxy_reserved_ip.ip_address}&port=${var.mtproxy_secondary_port}&secret=${local.fake_tls_secret_secondary}"
+  description = "Telegram proxy link for secondary proxy (separate IP, for ISPs like MegaFon)"
+  value       = "https://t.me/proxy?server=${oci_core_public_ip.mtproxy_secondary_ip.ip_address}&port=${var.mtproxy_secondary_port}&secret=${local.fake_tls_secret_secondary}"
   sensitive   = true
 }

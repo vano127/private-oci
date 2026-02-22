@@ -258,6 +258,8 @@ terraform output -raw ocir_token
 
 ### Build and Push Image Locally
 
+**IMPORTANT:** OCI Free Tier instances use AMD64 architecture. If building on Apple Silicon (M1/M2/M3), you MUST specify `--platform linux/amd64`.
+
 ```bash
 # Start podman machine
 podman machine start
@@ -265,9 +267,9 @@ podman machine start
 # Copy zscaler cert (gitignored, must copy before build)
 cp /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt /Users/kmvr200/IdeaProjects/personal-oci/docker/
 
-# Build image
+# Build image for AMD64 (required for OCI)
 cd /Users/kmvr200/IdeaProjects/personal-oci/docker
-podman build -t mtproxy:latest .
+podman build --platform linux/amd64 -t mtproxy:latest .
 
 # Login to OCIR
 OCIR_TOKEN=$(cd /Users/kmvr200/IdeaProjects/personal-oci/terraform && terraform output -raw ocir_token)

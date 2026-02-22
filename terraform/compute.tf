@@ -59,6 +59,8 @@ resource "oci_core_instance" "mtproxy" {
       mtproxy_port_secondary    = var.mtproxy_secondary_port
       mtproxy_secret_secondary  = random_bytes.mtproxy_secret_secondary.hex
       fake_tls_domain_secondary = var.mtproxy_secondary_domain
+      ocir_username             = "${data.oci_objectstorage_namespace.ns.namespace}/${var.ocir_user_email}"
+      ocir_token                = oci_identity_auth_token.ocir_token.token
     }))
   }
 
@@ -95,6 +97,24 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
   }
 }
 
-# Note: Both primary and secondary proxies run as containers on the same instance
-# Primary: port 443, cdn.jsdelivr.net
-# Secondary: port 8443, wildberries.ru (for ISPs like MegaFon)
+# Secondary private IP for second proxy
+resource "oci_core_private_ip" "mtproxy_secondary_private_ip" {
+  vnic_id      = data.oci_core_vnic.mtproxy_vnic.id
+  display_name = "mtproxy-secondary-private-ip"
+}
+
+# Reserved public IP for secondary proxy (static, required for secondary private IPs)
+resource "oci_core_public_ip" "mtproxy_secondary_ip" {
+  compartment_id = var.compartment_ocid
+  display_name   = "mtproxy-secondary-ip"
+  lifetime       = "RESERVED"
+  private_ip_id  = oci_core_private_ip.mtproxy_secondary_private_ip.id
+
+  freeform_tags = {
+    "Purpose" = "MTProxy-Secondary"
+  }
+}
+
+# Note: Two proxies on same instance with different IPs
+# Primary: Reserved IP, port 443, cdn.jsdelivr.net
+# Secondary: Ephemeral IP, port 9443, wildberries.ru

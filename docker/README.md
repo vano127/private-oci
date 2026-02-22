@@ -27,11 +27,11 @@ Custom MTProxy container with environment-based configuration.
 cp /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt /Users/kmvr200/IdeaProjects/personal-oci/docker/
 ```
 
-Then build:
+**IMPORTANT:** OCI Free Tier uses AMD64 architecture. If building on Apple Silicon (M1/M2/M3), specify `--platform linux/amd64`:
 
 ```bash
 cd /Users/kmvr200/IdeaProjects/personal-oci/docker
-podman build -t mtproxy:local .
+podman build --platform linux/amd64 -t mtproxy:local .
 ```
 
 ## Run Locally
