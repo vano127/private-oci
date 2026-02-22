@@ -12,6 +12,19 @@ runcmd:
   - iptables -I INPUT 5 -p tcp --dport ${mtproxy_port} -m state --state NEW -j ACCEPT
   - iptables -I INPUT 6 -p tcp --dport ${mtproxy_port_secondary} -m state --state NEW -j ACCEPT
   - netfilter-persistent save
+  # Configure secondary private IP (required for dual-IP setup)
+  - |
+    SECONDARY_IP="${secondary_private_ip}"
+    if [ -n "$SECONDARY_IP" ]; then
+      echo "Adding secondary IP $SECONDARY_IP to ens3"
+      ip addr add $SECONDARY_IP/24 dev ens3
+      # Make persistent via netplan
+      cat >> /etc/netplan/50-cloud-init.yaml << EOF
+        addresses:
+          - $SECONDARY_IP/24
+    EOF
+      netplan apply || true
+    fi
   - systemctl enable docker
   - systemctl start docker
   # Generate fake-TLS secret and start MTProxy with config file mode

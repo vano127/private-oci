@@ -91,3 +91,9 @@ variable "mtproxy_secondary_domain" {
   type        = string
   default     = "wildberries.ru"
 }
+
+variable "secondary_private_ip" {
+  description = "Static private IP for secondary proxy (must be in subnet CIDR 10.0.1.0/24)"
+  type        = string
+  default     = "10.0.1.100"
+}

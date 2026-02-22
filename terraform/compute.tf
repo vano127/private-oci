@@ -61,6 +61,7 @@ resource "oci_core_instance" "mtproxy" {
       fake_tls_domain_secondary = var.mtproxy_secondary_domain
       ocir_username             = "${data.oci_objectstorage_namespace.ns.namespace}/${var.ocir_user_email}"
       ocir_token                = oci_identity_auth_token.ocir_token.token
+      secondary_private_ip      = var.secondary_private_ip
     }))
   }
 
@@ -97,10 +98,11 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
   }
 }
 
-# Secondary private IP for second proxy
+# Secondary private IP for second proxy (static IP for OS configuration)
 resource "oci_core_private_ip" "mtproxy_secondary_private_ip" {
   vnic_id      = data.oci_core_vnic.mtproxy_vnic.id
   display_name = "mtproxy-secondary-private-ip"
+  ip_address   = var.secondary_private_ip
 }
 
 # Reserved public IP for secondary proxy (static, required for secondary private IPs)

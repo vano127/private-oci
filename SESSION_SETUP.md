@@ -244,6 +244,17 @@ Custom MTProxy image is stored in OCIR for GitOps deployment.
 | Namespace | `fratzuns8xud` |
 | Image | `fra.ocir.io/fratzuns8xud/mtproxy:latest` |
 
+## Dual-IP Setup
+
+The instance has two public IPs - one for each proxy:
+
+| Proxy | Public IP | Private IP | Port | Domain |
+|-------|-----------|------------|------|--------|
+| Primary | 92.5.20.109 (reserved) | auto | 443 | cdn.jsdelivr.net |
+| Secondary | dynamic (reserved) | 10.0.1.100 | 9443 | wildberries.ru |
+
+**Note:** The secondary private IP must be configured in the OS. Cloud-init handles this automatically using the static IP `10.0.1.100`.
+
 ### Get OCIR Credentials
 
 ```bash
