@@ -5,8 +5,13 @@ package_update: true
 packages:
   - docker.io
   - xxd
+  - iptables-persistent
 
 runcmd:
+  # Open firewall ports for MTProxy (OCI Ubuntu has restrictive iptables by default)
+  - iptables -I INPUT 5 -p tcp --dport ${mtproxy_port} -m state --state NEW -j ACCEPT
+  - iptables -I INPUT 6 -p tcp --dport ${mtproxy_port_secondary} -m state --state NEW -j ACCEPT
+  - netfilter-persistent save
   - systemctl enable docker
   - systemctl start docker
   # Generate fake-TLS secret and start MTProxy with config file mode
