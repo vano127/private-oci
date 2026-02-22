@@ -72,6 +72,13 @@ variable "mtproxy_fake_tls_domain" {
   default     = "cdn.jsdelivr.net"
 }
 
+# OCIR Variables
+variable "ocir_user_email" {
+  description = "Email for OCIR login (oracleidentitycloudservice user)"
+  type        = string
+  default     = ""
+}
+
 # Secondary MTProxy Variables
 variable "mtproxy_secondary_port" {
   description = "Secondary MTProxy listening port"

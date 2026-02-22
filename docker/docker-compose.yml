@@ -1,0 +1,47 @@
+# Docker Compose for MTProxy deployment
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in secrets
+#   2. docker-compose up -d
+#
+# For OCIR image, set IMAGE_REGISTRY in .env
+
+services:
+  mtproxy:
+    image: ${IMAGE_REGISTRY:-fra.ocir.io/YOUR_NAMESPACE}/mtproxy:latest
+    container_name: mtproxy
+    restart: always
+    ports:
+      - "${MTPROXY_PORT:-443}:3128"
+    environment:
+      - MTG_SECRET=${MTPROXY_SECRET}
+      - MTG_DOMAIN=${MTPROXY_DOMAIN:-cdn.jsdelivr.net}
+      - MTG_PORT=3128
+      - MTG_ANTI_REPLAY=true
+      - MTG_BLOCKLIST=true
+
+  mtproxy-secondary:
+    image: ${IMAGE_REGISTRY:-fra.ocir.io/YOUR_NAMESPACE}/mtproxy:latest
+    container_name: mtproxy-secondary
+    restart: always
+    ports:
+      - "${MTPROXY_SECONDARY_PORT:-8443}:${MTPROXY_SECONDARY_PORT:-8443}"
+    environment:
+      - MTG_SECRET=${MTPROXY_SECONDARY_SECRET}
+      - MTG_DOMAIN=${MTPROXY_SECONDARY_DOMAIN:-wildberries.ru}
+      - MTG_PORT=${MTPROXY_SECONDARY_PORT:-8443}
+      - MTG_ANTI_REPLAY=true
+      - MTG_BLOCKLIST=true
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+    command: mtproxy mtproxy-secondary

@@ -232,6 +232,61 @@ Russian ISPs cannot block these without massive collateral damage.
 
 ---
 
+## OCI Container Registry (OCIR)
+
+Custom MTProxy image is stored in OCIR for GitOps deployment.
+
+### Registry Details
+
+| Item | Value |
+|------|-------|
+| Registry | `fra.ocir.io` (NOT eu-frankfurt-1.ocir.io) |
+| Namespace | `fratzuns8xud` |
+| Image | `fra.ocir.io/fratzuns8xud/mtproxy:latest` |
+
+### Get OCIR Credentials
+
+```bash
+cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
+
+# Get username
+terraform output -raw ocir_username
+
+# Get token (password)
+terraform output -raw ocir_token
+```
+
+### Build and Push Image Locally
+
+```bash
+# Start podman machine
+podman machine start
+
+# Build image (zscaler cert required for corporate proxy)
+cd /Users/kmvr200/IdeaProjects/personal-oci/docker
+podman build -t mtproxy:latest .
+
+# Login to OCIR
+OCIR_TOKEN=$(cd /Users/kmvr200/IdeaProjects/personal-oci/terraform && terraform output -raw ocir_token)
+echo "$OCIR_TOKEN" | podman login fra.ocir.io -u "fratzuns8xud/m.bikova2009@gmail.com" --password-stdin
+
+# Tag and push
+podman tag localhost/mtproxy:latest fra.ocir.io/fratzuns8xud/mtproxy:latest
+podman push fra.ocir.io/fratzuns8xud/mtproxy:latest
+```
+
+### Custom Image Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MTG_SECRET` | Yes | - | Base secret (16 bytes hex) |
+| `MTG_DOMAIN` | Yes | - | Fake-TLS domain |
+| `MTG_PORT` | No | 3128 | Container bind port |
+| `MTG_ANTI_REPLAY` | No | true | Enable anti-replay |
+| `MTG_BLOCKLIST` | No | true | Enable IP blocklist |
+
+---
+
 ## File Structure
 
 ```
@@ -241,10 +296,19 @@ Russian ISPs cannot block these without massive collateral damage.
 │   ├── cloud-init.yaml       # Instance initialization (Docker + both MTProxy containers)
 │   ├── compute.tf            # Instance and image configuration
 │   ├── network.tf            # VCN, subnet, security list
+│   ├── ocir.tf               # OCIR repository and auth token
 │   ├── outputs.tf            # Terraform outputs (proxy links)
 │   ├── providers.tf          # Provider configuration
 │   ├── variables.tf          # Variable definitions
 │   └── terraform.tfvars      # Variable values (not in git)
+├── docker/
+│   ├── Dockerfile            # Custom MTProxy image
+│   ├── entrypoint.sh         # Config generation from env vars
+│   ├── docker-compose.yml    # Deployment with Watchtower
+│   ├── .env.example          # Environment template
+│   └── zscaler.crt           # Zscaler cert for image build
+├── .github/workflows/
+│   └── build-image.yml       # CI/CD pipeline for OCIR
 ├── scripts/
 │   └── bastion-setup.sh      # Helper script for SSH via K8s bastion
 ├── zscaler.crt               # Zscaler certificate for HTTPS fetches
