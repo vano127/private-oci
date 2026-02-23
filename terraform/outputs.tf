@@ -133,3 +133,22 @@ output "v2raytun_import_link" {
   value       = "v2raytun://import/vless://${random_uuid.vless_uuid.result}@${oci_core_public_ip.mtproxy_reserved_ip.ip_address}:${var.vless_port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${var.vless_dest_domain}&fp=chrome&pbk=${data.external.vless_reality_keys.result.public_key}&sid=&type=tcp#OCI-VLESS-Reality"
   sensitive   = true
 }
+
+# Subscription outputs (v2raytun with Telegram-only routing)
+output "subscription_token" {
+  description = "Secret token for subscription URL access"
+  value       = random_bytes.subscription_token.hex
+  sensitive   = true
+}
+
+output "subscription_url" {
+  description = "Subscription URL with Telegram-only routing (share with users)"
+  value       = "http://${oci_core_public_ip.mtproxy_reserved_ip.ip_address}:8080/sub/${random_bytes.subscription_token.hex}"
+  sensitive   = true
+}
+
+output "v2raytun_subscription_link" {
+  description = "v2raytun deep link for subscription with Telegram-only routing (use in QR code)"
+  value       = "v2raytun://import/http://${oci_core_public_ip.mtproxy_reserved_ip.ip_address}:8080/sub/${random_bytes.subscription_token.hex}"
+  sensitive   = true
+}

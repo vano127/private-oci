@@ -91,6 +91,19 @@ resource "oci_core_security_list" "mtproxy_sl" {
       max = var.vless_port
     }
   }
+
+  # Ingress - Subscription server
+  ingress_security_rules {
+    protocol    = "6" # TCP
+    source      = "0.0.0.0/0"
+    stateless   = false
+    description = "v2raytun subscription endpoint"
+
+    tcp_options {
+      min = 8080
+      max = 8080
+    }
+  }
 }
 
 # Public Subnet

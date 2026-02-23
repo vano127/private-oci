@@ -12,6 +12,7 @@ runcmd:
   - iptables -I INPUT 5 -p tcp --dport ${mtproxy_port} -m state --state NEW -j ACCEPT
   - iptables -I INPUT 6 -p tcp --dport ${mtproxy_port_secondary} -m state --state NEW -j ACCEPT
   - iptables -I INPUT 7 -p tcp --dport ${vless_port} -m state --state NEW -j ACCEPT
+  - iptables -I INPUT 8 -p tcp --dport 8080 -m state --state NEW -j ACCEPT
   - netfilter-persistent save
   # Configure secondary private IP (required for dual-IP setup)
   - |
@@ -158,6 +159,64 @@ runcmd:
 
     # Start Xray container
     docker run -d --name xray-vless --restart always \
+      -e TZ=UTC \
       -p ${vless_port}:${vless_port} \
       -v /home/ubuntu/xray-config.json:/etc/xray/config.json:ro \
       teddysun/xray
+
+  # Subscription server for v2raytun (Telegram-only routing via proxy)
+  - |
+    echo "Setting up subscription server..."
+
+    # Wait for public IP (reserved IP assigned by Terraform, not in instance metadata)
+    PUBLIC_IP=""
+    for i in $(seq 1 60); do
+      PUBLIC_IP=$(curl -sf --max-time 5 ifconfig.me 2>/dev/null)
+      if [ -n "$PUBLIC_IP" ]; then
+        echo "Public IP found: $PUBLIC_IP"
+        break
+      fi
+      echo "Waiting for public IP... ($i/60)"
+      sleep 5
+    done
+
+    if [ -z "$PUBLIC_IP" ]; then
+      echo "ERROR: Could not determine public IP, skipping subscription server"
+      exit 1
+    fi
+
+    # Build VLESS link with actual public IP
+    VLESS_LINK="vless://${vless_uuid}@$${PUBLIC_IP}:${vless_port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${vless_dest_domain}&fp=chrome&pbk=${vless_public_key}&sid=&type=tcp#OCI-VLESS-Reality"
+
+    # Base64 encode for subscription body
+    SUB_BODY=$(echo -n "$VLESS_LINK" | base64 -w 0)
+
+    # Telegram-only routing: proxy for Telegram, direct for everything else
+    ROUTING_JSON='{"domainStrategy":"IPIfNonMatch","rules":[{"type":"field","domain":["geosite:telegram"],"outboundTag":"proxy"},{"type":"field","ip":["geoip:telegram"],"outboundTag":"proxy"},{"type":"field","port":"0-65535","outboundTag":"direct"}]}'
+    ROUTING_B64=$(echo -n "$ROUTING_JSON" | base64 -w 0)
+
+    # Create nginx config for subscription endpoint
+    cat > /home/ubuntu/nginx-sub.conf << NGINXCONF
+    server {
+        listen 8080 default_server;
+        default_type text/plain;
+
+        location = /sub/${subscription_token} {
+            add_header profile-title "OCI VLESS Proxy" always;
+            add_header routing "$ROUTING_B64" always;
+            add_header profile-update-interval "24" always;
+            return 200 "$SUB_BODY";
+        }
+
+        location / {
+            return 404;
+        }
+    }
+    NGINXCONF
+
+    docker run -d --name nginx-sub --restart always \
+      -p 8080:8080 \
+      -v /home/ubuntu/nginx-sub.conf:/etc/nginx/conf.d/default.conf:ro \
+      nginx:alpine
+
+    echo "Subscription server started on port 8080"

@@ -8,6 +8,11 @@ resource "random_bytes" "mtproxy_secret_secondary" {
   length = 16
 }
 
+# Generate subscription token for secure access
+resource "random_bytes" "subscription_token" {
+  length = 16
+}
+
 # Generate VLESS UUID
 resource "random_uuid" "vless_uuid" {}
 
@@ -93,6 +98,7 @@ resource "oci_core_instance" "mtproxy" {
       vless_dest_domain         = var.vless_dest_domain
       vless_private_key         = data.external.vless_reality_keys.result.private_key
       vless_public_key          = data.external.vless_reality_keys.result.public_key
+      subscription_token        = random_bytes.subscription_token.hex
     }))
   }
 
