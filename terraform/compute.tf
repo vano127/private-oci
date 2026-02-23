@@ -55,6 +55,16 @@ resource "oci_core_instance" "mtproxy" {
     }
   }
 
+  agent_config {
+    are_all_plugins_disabled = false
+    is_management_disabled   = false
+    is_monitoring_disabled   = false
+    plugins_config {
+      desired_state = "ENABLED"
+      name          = "Compute Instance Monitoring"
+    }
+  }
+
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ubuntu.images[0].id
@@ -102,9 +112,14 @@ data "oci_core_vnic" "mtproxy_vnic" {
   vnic_id = data.oci_core_vnic_attachments.mtproxy_vnic_attachments.vnic_attachments[0].vnic_id
 }
 
-# Get private IP
-data "oci_core_private_ips" "mtproxy_private_ip" {
+# Get primary private IP (filter to avoid picking secondary)
+data "oci_core_private_ips" "mtproxy_primary_private_ip" {
   vnic_id = data.oci_core_vnic.mtproxy_vnic.id
+
+  filter {
+    name   = "is_primary"
+    values = ["true"]
+  }
 }
 
 # Reserved public IP (static, persists across instance recreates)
@@ -112,7 +127,7 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
   compartment_id = var.compartment_ocid
   display_name   = "mtproxy-reserved-ip"
   lifetime       = "RESERVED"
-  private_ip_id  = data.oci_core_private_ips.mtproxy_private_ip.private_ips[0].id
+  private_ip_id  = data.oci_core_private_ips.mtproxy_primary_private_ip.private_ips[0].id
 
   freeform_tags = {
     "Purpose" = "MTProxy"
