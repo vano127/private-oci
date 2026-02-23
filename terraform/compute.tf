@@ -8,6 +8,22 @@ resource "random_bytes" "mtproxy_secret_secondary" {
   length = 16
 }
 
+# Generate VLESS UUID
+resource "random_uuid" "vless_uuid" {}
+
+# Generate x25519 private key for VLESS Reality
+resource "random_bytes" "vless_reality_private_key" {
+  length = 32
+}
+
+# Derive x25519 public key from private key
+data "external" "vless_reality_keys" {
+  program = ["python3", "${path.module}/scripts/derive-x25519-pubkey.py"]
+  query = {
+    private_key_hex = random_bytes.vless_reality_private_key.hex
+  }
+}
+
 # Get latest Ubuntu 22.04 Minimal image
 data "oci_core_images" "ubuntu" {
   compartment_id           = var.compartment_ocid
@@ -62,6 +78,11 @@ resource "oci_core_instance" "mtproxy" {
       ocir_username             = "${data.oci_objectstorage_namespace.ns.namespace}/${var.ocir_user_email}"
       ocir_token                = oci_identity_auth_token.ocir_token.token
       secondary_private_ip      = var.secondary_private_ip
+      vless_port                = var.vless_port
+      vless_uuid                = random_uuid.vless_uuid.result
+      vless_dest_domain         = var.vless_dest_domain
+      vless_private_key         = data.external.vless_reality_keys.result.private_key
+      vless_public_key          = data.external.vless_reality_keys.result.public_key
     }))
   }
 
@@ -119,4 +140,4 @@ resource "oci_core_public_ip" "mtproxy_secondary_ip" {
 
 # Note: Two proxies on same instance with different IPs
 # Primary: Reserved IP, port 443, cdn.jsdelivr.net
-# Secondary: Ephemeral IP, port 9443, wildberries.ru
+# Secondary: Reserved IP, port 8443/9443, wildberries.ru

@@ -78,6 +78,19 @@ resource "oci_core_security_list" "mtproxy_sl" {
       max = var.mtproxy_secondary_port
     }
   }
+
+  # Ingress - VLESS + Reality
+  ingress_security_rules {
+    protocol    = "6" # TCP
+    source      = "0.0.0.0/0"
+    stateless   = false
+    description = "VLESS Reality access"
+
+    tcp_options {
+      min = var.vless_port
+      max = var.vless_port
+    }
+  }
 }
 
 # Public Subnet

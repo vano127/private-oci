@@ -97,3 +97,16 @@ variable "secondary_private_ip" {
   type        = string
   default     = "10.0.1.100"
 }
+
+# VLESS + Reality Variables
+variable "vless_port" {
+  description = "VLESS + Reality listening port"
+  type        = number
+  default     = 8443
+}
+
+variable "vless_dest_domain" {
+  description = "Reality destination domain (for SNI and TLS fingerprinting)"
+  type        = string
+  default     = "www.microsoft.com"
+}
