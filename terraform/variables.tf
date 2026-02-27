@@ -59,45 +59,6 @@ variable "instance_memory_gb" {
   default     = 1
 }
 
-# MTProxy Variables
-variable "mtproxy_port" {
-  description = "MTProxy listening port"
-  type        = number
-  default     = 443
-}
-
-variable "mtproxy_fake_tls_domain" {
-  description = "Domain to impersonate for fake-TLS (helps bypass throttling)"
-  type        = string
-  default     = "cdn.jsdelivr.net"
-}
-
-# OCIR Variables
-variable "ocir_user_email" {
-  description = "Email for OCIR login (oracleidentitycloudservice user)"
-  type        = string
-  default     = ""
-}
-
-# Secondary MTProxy Variables
-variable "mtproxy_secondary_port" {
-  description = "Secondary MTProxy listening port"
-  type        = number
-  default     = 8443
-}
-
-variable "mtproxy_secondary_domain" {
-  description = "Domain for secondary proxy (less monitored Russian domain)"
-  type        = string
-  default     = "wildberries.ru"
-}
-
-variable "secondary_private_ip" {
-  description = "Static private IP for secondary proxy (must be in subnet CIDR 10.0.1.0/24)"
-  type        = string
-  default     = "10.0.1.100"
-}
-
 # VLESS + Reality Variables
 variable "vless_port" {
   description = "VLESS + Reality listening port"

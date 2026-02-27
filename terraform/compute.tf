@@ -1,13 +1,3 @@
-# Generate MTProxy secret
-resource "random_bytes" "mtproxy_secret" {
-  length = 16
-}
-
-# Generate Secondary MTProxy secret
-resource "random_bytes" "mtproxy_secret_secondary" {
-  length = 16
-}
-
 # Generate subscription token for secure access
 resource "random_bytes" "subscription_token" {
   length = 16
@@ -44,7 +34,7 @@ data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
 }
 
-# MTProxy Instance
+# Proxy Instance
 resource "oci_core_instance" "mtproxy" {
   compartment_id      = var.compartment_ocid
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
@@ -84,21 +74,12 @@ resource "oci_core_instance" "mtproxy" {
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
-      mtproxy_port              = var.mtproxy_port
-      mtproxy_secret            = random_bytes.mtproxy_secret.hex
-      fake_tls_domain           = var.mtproxy_fake_tls_domain
-      mtproxy_port_secondary    = var.mtproxy_secondary_port
-      mtproxy_secret_secondary  = random_bytes.mtproxy_secret_secondary.hex
-      fake_tls_domain_secondary = var.mtproxy_secondary_domain
-      ocir_username             = "${data.oci_objectstorage_namespace.ns.namespace}/${var.ocir_user_email}"
-      ocir_token                = oci_identity_auth_token.ocir_token.token
-      secondary_private_ip      = var.secondary_private_ip
-      vless_port                = var.vless_port
-      vless_uuid                = random_uuid.vless_uuid.result
-      vless_dest_domain         = var.vless_dest_domain
-      vless_private_key         = data.external.vless_reality_keys.result.private_key
-      vless_public_key          = data.external.vless_reality_keys.result.public_key
-      subscription_token        = random_bytes.subscription_token.hex
+      vless_port         = var.vless_port
+      vless_uuid         = random_uuid.vless_uuid.result
+      vless_dest_domain  = var.vless_dest_domain
+      vless_private_key  = data.external.vless_reality_keys.result.private_key
+      vless_public_key   = data.external.vless_reality_keys.result.public_key
+      subscription_token = random_bytes.subscription_token.hex
     }))
   }
 
@@ -139,26 +120,3 @@ resource "oci_core_public_ip" "mtproxy_reserved_ip" {
     "Purpose" = "MTProxy"
   }
 }
-
-# Secondary private IP for second proxy (static IP for OS configuration)
-resource "oci_core_private_ip" "mtproxy_secondary_private_ip" {
-  vnic_id      = data.oci_core_vnic.mtproxy_vnic.id
-  display_name = "mtproxy-secondary-private-ip"
-  ip_address   = var.secondary_private_ip
-}
-
-# Reserved public IP for secondary proxy (static, required for secondary private IPs)
-resource "oci_core_public_ip" "mtproxy_secondary_ip" {
-  compartment_id = var.compartment_ocid
-  display_name   = "mtproxy-secondary-ip"
-  lifetime       = "RESERVED"
-  private_ip_id  = oci_core_private_ip.mtproxy_secondary_private_ip.id
-
-  freeform_tags = {
-    "Purpose" = "MTProxy-Secondary"
-  }
-}
-
-# Note: Two proxies on same instance with different IPs
-# Primary: Reserved IP, port 443, cdn.jsdelivr.net
-# Secondary: Reserved IP, port 8443/9443, wildberries.ru

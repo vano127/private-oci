@@ -53,32 +53,6 @@ resource "oci_core_security_list" "mtproxy_sl" {
     }
   }
 
-  # Ingress - MTProxy
-  ingress_security_rules {
-    protocol    = "6" # TCP
-    source      = "0.0.0.0/0"
-    stateless   = false
-    description = "MTProxy access"
-
-    tcp_options {
-      min = var.mtproxy_port
-      max = var.mtproxy_port
-    }
-  }
-
-  # Ingress - MTProxy Secondary
-  ingress_security_rules {
-    protocol    = "6" # TCP
-    source      = "0.0.0.0/0"
-    stateless   = false
-    description = "MTProxy secondary access"
-
-    tcp_options {
-      min = var.mtproxy_secondary_port
-      max = var.mtproxy_secondary_port
-    }
-  }
-
   # Ingress - VLESS + Reality
   ingress_security_rules {
     protocol    = "6" # TCP
