@@ -107,7 +107,7 @@ runcmd:
     fi
 
     # Build VLESS link with actual public IP
-    VLESS_LINK="vless://${vless_uuid}@$${PUBLIC_IP}:${vless_port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${vless_dest_domain}&fp=chrome&pbk=${vless_public_key}&sid=&type=tcp#OCI-VLESS-Reality"
+    VLESS_LINK="vless://${vless_uuid}@$${PUBLIC_IP}:${vless_port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${vless_dest_domain}&fp=chrome&pbk=${vless_public_key}&sid=0123456789abcdef&type=tcp#OCI-VLESS-Reality"
 
     # Base64 encode for subscription body
     SUB_BODY=$(echo -n "$VLESS_LINK" | base64 -w 0)
@@ -120,7 +120,7 @@ runcmd:
 
         location = /sub/${subscription_token} {
             add_header profile-title "OCI VLESS Proxy" always;
-            add_header profile-update-interval "0.17" always;
+            add_header profile-update-interval "1" always;
             return 200 "$SUB_BODY";
         }
 
