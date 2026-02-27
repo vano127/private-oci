@@ -1,6 +1,6 @@
 # Session Setup Guide
 
-This document captures all the tools and setup used to deploy MTProxy and VLESS + Reality on OCI.
+This document captures all the tools and setup used to deploy VLESS + Reality proxy on OCI.
 
 **IMPORTANT:** All infrastructure changes must be applied through Terraform for reproducibility. Manual commands via bastion are for testing only.
 
@@ -25,6 +25,18 @@ export CURL_CA_BUNDLE=/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt
 export REQUESTS_CA_BUNDLE=/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt
 ```
 
+### Required Environment Variables for Terraform
+
+OCI Object Storage S3-compatible backend requires these env vars for all `terraform` commands:
+
+```bash
+export AWS_CA_BUNDLE="/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt"
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+```
+
+`AWS_REQUEST_CHECKSUM_CALCULATION=when_required` is needed because OCI Object Storage does not support AWS chunked transfer encoding. Without it, state uploads fail with `501 NotImplemented`.
+
 ## Infrastructure Overview
 
 - **Cloud Provider**: Oracle Cloud Infrastructure (OCI) Free Tier
@@ -32,29 +44,16 @@ export REQUESTS_CA_BUNDLE=/Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt
 - **OS**: Ubuntu 22.04 Minimal (chosen for low memory footprint ~200MB vs Oracle Linux ~400MB)
 - **Region**: eu-frankfurt-1 (Frankfurt - Free Tier home region)
 - **Static IP**: Reserved public IP (persists across instance recreates)
+- **Terraform State**: Remote, OCI Object Storage via S3-compatible backend (bucket: `terraform-state`)
 
 ## Current Configuration
 
-Four containers run on the same instance, all deployed automatically via cloud-init:
+Two containers run on the instance, deployed automatically via cloud-init:
 
 | Container | Image | Port | Purpose |
 |-----------|-------|------|---------|
-| mtproxy | nineseconds/mtg:2 | 443 | Primary Telegram proxy (cdn.jsdelivr.net) |
-| mtproxy-secondary | fra.ocir.io/fratzuns8xud/mtproxy:latest | 9443 | Secondary Telegram proxy (wildberries.ru) |
 | xray-vless | teddysun/xray | 8443 | VLESS + Reality server (TZ=UTC) |
-| nginx-sub | nginx:alpine | 8080 | v2raytun subscription server (Telegram-only routing) |
-
-### Primary Proxy (cdn.jsdelivr.net)
-- **Port**: 443
-- **Domain**: cdn.jsdelivr.net (well-known CDN)
-- **Container**: mtproxy
-- **Config**: /home/ubuntu/mtg-config.toml
-
-### Secondary Proxy (wildberries.ru) - For MegaFon
-- **Port**: 9443
-- **Domain**: wildberries.ru (major Russian e-commerce, less monitored)
-- **Container**: mtproxy-secondary
-- **Config**: /home/ubuntu/mtg-config-secondary.toml
+| nginx-sub | nginx:alpine | 8080 | v2raytun subscription server |
 
 ### VLESS + Reality Server
 - **Port**: 8443 (configurable via `vless_port`)
@@ -70,23 +69,8 @@ Four containers run on the same instance, all deployed automatically via cloud-i
 - **Config**: /home/ubuntu/nginx-sub.conf
 - **Endpoint**: `GET /sub/<token>` — returns base64-encoded VLESS link with v2raytun headers
 - **Auth**: Secret random token in URL path (32 hex chars), 404 for all other paths
-- **Routing**: Pushes Telegram-only routing via `routing` header (`geosite:telegram` + `geoip:telegram` → proxy, everything else → direct)
-- **Headers**: `profile-title`, `routing`, `profile-update-interval` (24h auto-refresh)
-
-### Get Proxy Links
-
-```bash
-cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
-
-# Primary proxy link
-terraform output -raw telegram_proxy_link
-
-# Secondary proxy link
-terraform output -raw telegram_proxy_link_secondary
-
-# All outputs
-terraform output
-```
+- **Headers**: `profile-title`, `profile-update-interval` (10 min auto-refresh)
+- **No routing rules** — client app handles routing
 
 ### Get VLESS + Reality Link
 
@@ -108,9 +92,9 @@ terraform output -raw v2raytun_import_link
 terraform output -raw vless_public_key
 ```
 
-### Get Subscription Link (v2raytun with Telegram-only routing)
+### Get Subscription Link
 
-The subscription URL includes Telegram-only routing rules so v2raytun only proxies Telegram traffic (everything else goes direct). Clients auto-refresh every 24 hours.
+The subscription URL returns the VLESS link. Clients auto-refresh every 10 minutes, so IP changes after instance recreates are picked up automatically.
 
 ```bash
 cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
@@ -128,13 +112,6 @@ python3 scripts/generate-qr.py
 **Mobile Clients for VLESS + Reality:**
 - **Android**: v2raytun (Google Play), Hiddify (free), v2rayNG (free, open-source)
 - **iOS**: Streisand (free), Shadowrocket ($2.99)
-
-### Features Enabled (both MTProxy instances)
-- **Fake-TLS**: Disguises traffic as HTTPS
-- **Anti-replay**: Blocks DPI probe replay attacks (1MB bloom filter cache)
-- **IP Blocklist**: FireHOL level1 (~40k IPs)
-- **DC Fallback**: Enabled for better connectivity
-- **Timeouts**: 30s TCP/HTTP, 5m idle
 
 ---
 
@@ -156,20 +133,12 @@ terraform apply
 
 ### Change Proxy Configuration
 
-To change domains or ports, update `terraform.tfvars`:
+To change ports or SNI domain, update `terraform.tfvars`:
 
 ```hcl
-# Primary proxy
-mtproxy_port            = 443
-mtproxy_fake_tls_domain = "cdn.jsdelivr.net"
-
-# Secondary proxy
-mtproxy_secondary_port   = 9443
-mtproxy_secondary_domain = "wildberries.ru"
-
 # VLESS + Reality
-vless_port              = 8443
-vless_dest_domain       = "www.microsoft.com"
+vless_port        = 8443
+vless_dest_domain = "www.microsoft.com"
 ```
 
 Then recreate the instance to apply changes:
@@ -177,6 +146,16 @@ Then recreate the instance to apply changes:
 ```bash
 cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
 terraform apply -replace=oci_core_instance.mtproxy
+```
+
+### Force New IP
+
+Taint the reserved IP to get a fresh public address:
+
+```bash
+cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
+terraform taint oci_core_public_ip.mtproxy_reserved_ip
+terraform apply
 ```
 
 ### Get Outputs
@@ -188,8 +167,6 @@ terraform output
 
 # Get specific outputs
 terraform output instance_public_ip
-terraform output -raw telegram_proxy_link
-terraform output -raw telegram_proxy_link_secondary
 terraform output -raw vless_link
 terraform output -raw hiddify_import_link
 terraform output -raw v2raytun_import_link
@@ -209,6 +186,8 @@ terraform destroy
 
 Use the bastion script for testing and debugging. For permanent changes, update Terraform instead.
 
+**IMPORTANT:** Direct SSH from local machine does not work (corporate network). Always use the bastion pod.
+
 ```bash
 # Setup bastion pod
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh setup
@@ -218,7 +197,7 @@ Use the bastion script for testing and debugging. For permanent changes, update 
 
 # Execute command on OCI instance (testing only)
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker ps"
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs mtproxy"
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs xray-vless"
 
 # Interactive SSH
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh ssh
@@ -227,68 +206,35 @@ Use the bastion script for testing and debugging. For permanent changes, update 
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh cleanup
 ```
 
+### Host key changed after instance recreate
+```bash
+# Clear known_hosts on bastion pod directly via kubectl
+kubectl --context "arn:aws:eks:eu-west-1:747626100725:cluster/az-img-dev-kfv2-eks" exec bastion-pod -- sh -c "ssh-keygen -R 138.2.138.182 2>/dev/null"
+```
+
 ---
 
-## Monitoring Proxy Statistics
+## Monitoring
 
 ### Check Proxy Status
 ```bash
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker ps"
 ```
 
-### Check Active Connections
+### Check VLESS Connections
 ```bash
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "ss -tn state established '( sport = :443 )' | tail -n +2 | wc -l"
+# Active connections on VLESS port
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "ss -tn state established '( sport = :8443 )' | tail -n +2 | wc -l"
+
+# Xray logs
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs xray-vless --tail 50"
 ```
 
-### Check Connection Statistics
+### Check Subscription Server
 ```bash
-# Failed handshakes (blocked probes/scanners)
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep -c "handshake is failed"'
-
-# Successful streams
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep -c "Stream has been started"'
-
-# Unique client IPs with connection counts
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec 'sudo docker logs mtproxy 2>&1 | grep "client-ip" | grep -oE "client-ip\":\"[0-9.]+" | sort | uniq -c | sort -rn'
+# Test subscription endpoint from bastion
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "curl -s http://localhost:8080/sub/<token>"
 ```
-
-### What Gets Blocked
-
-| Protection | What It Blocks |
-|------------|----------------|
-| Anti-replay | DPI probes replaying captured handshakes |
-| IP Blocklist | Known scanners/attackers (FireHOL list ~40k IPs) |
-| Invalid handshake | Scanners sending non-MTProxy traffic |
-
----
-
-## Recommended Fake-TLS Domains
-
-### Tier 1: Russian Services (Best for Russia)
-Russian ISPs cannot block these without massive collateral damage.
-
-| Domain | Why It's Good |
-|--------|---------------|
-| `wildberries.ru` | Major Russian e-commerce |
-| `ozon.ru` | Russian Amazon-like |
-| `vk.com` | Major Russian social network |
-| `yandex.ru` | Russian search/services (may be monitored) |
-
-### Tier 2: International CDNs
-
-| Domain | Why It's Good |
-|--------|---------------|
-| `cdn.jsdelivr.net` | Used by many websites |
-| `storage.googleapis.com` | Google Cloud storage |
-
-### Tier 3: Common (May Be Fingerprinted)
-
-| Domain | Risk Level |
-|--------|------------|
-| `www.microsoft.com` | Medium |
-| `www.google.com` | High (common target) |
-| `cloudflare.com` | High (very common) |
 
 ---
 
@@ -298,81 +244,10 @@ Russian ISPs cannot block these without massive collateral damage.
 |----------|-------|---------------|
 | AMD Compute (VM.Standard.E2.1.Micro) | 2 instances | 1 |
 | Boot Volume | 200 GB | 47 GB |
-| Reserved Public IP | Included | 2 (primary + secondary) |
+| Reserved Public IP | Included | 1 |
 | Outbound Data | 10 TB/month | ~minimal |
 
 **Free tier has no time limit** - resources remain free indefinitely.
-
----
-
-## OCI Container Registry (OCIR)
-
-Custom MTProxy image is stored in OCIR for GitOps deployment.
-
-### Registry Details
-
-| Item | Value |
-|------|-------|
-| Registry | `fra.ocir.io` (NOT eu-frankfurt-1.ocir.io) |
-| Namespace | `fratzuns8xud` |
-| Image | `fra.ocir.io/fratzuns8xud/mtproxy:latest` |
-
-## Dual-IP Setup
-
-The instance has two public IPs - one for each proxy:
-
-| Proxy | Public IP | Private IP | Port | Domain |
-|-------|-----------|------------|------|--------|
-| Primary | 92.5.20.109 (reserved) | auto | 443 | cdn.jsdelivr.net |
-| Secondary | dynamic (reserved) | 10.0.1.100 | 9443 | wildberries.ru |
-
-**Note:** The secondary private IP must be configured in the OS. Cloud-init handles this automatically using the static IP `10.0.1.100`.
-
-### Get OCIR Credentials
-
-```bash
-cd /Users/kmvr200/IdeaProjects/personal-oci/terraform
-
-# Get username
-terraform output -raw ocir_username
-
-# Get token (password)
-terraform output -raw ocir_token
-```
-
-### Build and Push Image Locally
-
-**IMPORTANT:** OCI Free Tier instances use AMD64 architecture. If building on Apple Silicon (M1/M2/M3), you MUST specify `--platform linux/amd64`.
-
-```bash
-# Start podman machine
-podman machine start
-
-# Copy zscaler cert (gitignored, must copy before build)
-cp /Users/kmvr200/IdeaProjects/personal-oci/zscaler.crt /Users/kmvr200/IdeaProjects/personal-oci/docker/
-
-# Build image for AMD64 (required for OCI)
-cd /Users/kmvr200/IdeaProjects/personal-oci/docker
-podman build --platform linux/amd64 -t mtproxy:latest .
-
-# Login to OCIR
-OCIR_TOKEN=$(cd /Users/kmvr200/IdeaProjects/personal-oci/terraform && terraform output -raw ocir_token)
-echo "$OCIR_TOKEN" | podman login fra.ocir.io -u "fratzuns8xud/m.bikova2009@gmail.com" --password-stdin
-
-# Tag and push
-podman tag localhost/mtproxy:latest fra.ocir.io/fratzuns8xud/mtproxy:latest
-podman push fra.ocir.io/fratzuns8xud/mtproxy:latest
-```
-
-### Custom Image Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `MTG_SECRET` | Yes | - | Base secret (16 bytes hex) |
-| `MTG_DOMAIN` | Yes | - | Fake-TLS domain |
-| `MTG_PORT` | No | 3128 | Container bind port |
-| `MTG_ANTI_REPLAY` | No | true | Enable anti-replay |
-| `MTG_BLOCKLIST` | No | true | Enable IP blocklist |
 
 ---
 
@@ -381,25 +256,16 @@ podman push fra.ocir.io/fratzuns8xud/mtproxy:latest
 ```
 /Users/kmvr200/IdeaProjects/personal-oci/
 ├── terraform/
-│   ├── backend.conf          # S3 backend configuration
-│   ├── cloud-init.yaml       # Instance initialization (Docker + all containers)
+│   ├── backend.conf          # S3 backend credentials (not in git)
+│   ├── cloud-init.yaml       # Instance initialization (Docker + containers)
 │   ├── compute.tf            # Instance, IPs, and VLESS UUID generation
-│   ├── network.tf            # VCN, subnet, security list (ports 443, 9443, 8443, 8080)
-│   ├── ocir.tf               # OCIR repository and auth token
-│   ├── outputs.tf            # Terraform outputs (proxy links, VLESS, subscription)
-│   ├── providers.tf          # Provider configuration
-│   ├── variables.tf          # Variable definitions (incl. VLESS settings)
+│   ├── network.tf            # VCN, subnet, security list (ports 22, 8443, 8080)
+│   ├── outputs.tf            # Terraform outputs (VLESS links, subscription)
+│   ├── providers.tf          # Provider config + S3 remote backend
+│   ├── variables.tf          # Variable definitions
 │   ├── terraform.tfvars      # Variable values (not in git)
 │   └── scripts/
 │       └── derive-x25519-pubkey.py  # x25519 key derivation for Terraform external data source
-├── docker/
-│   ├── Dockerfile            # Custom MTProxy image
-│   ├── entrypoint.sh         # Config generation from env vars
-│   ├── docker-compose.yml    # Deployment with Watchtower
-│   ├── .env.example          # Environment template
-│   └── zscaler.crt           # Zscaler cert for image build
-├── .github/workflows/
-│   └── build-image.yml       # CI/CD pipeline for OCIR
 ├── scripts/
 │   ├── bastion-setup.sh      # Helper script for SSH via K8s bastion
 │   └── generate-qr.py        # QR code generator for subscription/VLESS links
@@ -411,7 +277,6 @@ podman push fra.ocir.io/fratzuns8xud/mtproxy:latest
 
 ```
 /home/ubuntu/
-├── mtg-config.toml           # Primary MTProxy config (generated by cloud-init)
 ├── xray-config.json          # VLESS + Reality Xray config (generated by cloud-init)
 └── nginx-sub.conf            # Nginx subscription endpoint config (generated by cloud-init)
 ```
@@ -430,42 +295,20 @@ podman push fra.ocir.io/fratzuns8xud/mtproxy:latest
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo systemctl status docker"
 ```
 
-### MTProxy container issues
-```bash
-# Check container logs
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs mtproxy"
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs mtproxy-secondary"
-
-# Restart container
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker restart mtproxy"
-```
-
 ### VLESS + Reality issues
 ```bash
 # Check Xray container
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker logs xray-vless"
 
-# Verify Reality public key (should match terraform output -raw vless_public_key)
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker exec xray-vless cat /etc/xray/config.json | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"inbounds\"][0][\"streamSettings\"][\"realitySettings\"][\"privateKey\"])'"
+# Check iptables
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo iptables -L INPUT -n --line-numbers"
 
 # Test port connectivity from bastion
-/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "nc -zv -w 5 92.5.20.109 8443"
+/Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "nc -zv -w 5 138.2.138.182 8443"
 
 # Restart Xray
 /Users/kmvr200/IdeaProjects/personal-oci/scripts/bastion-setup.sh exec "sudo docker restart xray-vless"
 ```
-
-### Host key changed after instance recreate
-```bash
-# Clear known_hosts on bastion pod
-kubectl --context $K8S_CONTEXT exec bastion-pod -- rm -f /root/.ssh/known_hosts
-```
-
-### Slow speeds from Russia
-1. Change domain in `terraform.tfvars` and recreate instance
-2. Try Russian domains (`wildberries.ru`, `ozon.ru`) - less likely to be fingerprinted
-3. Use VLESS + Reality (better DPI evasion than MTProxy)
-4. If all fails, consider Shadowsocks or WireGuard
 
 ### VLESS client not connecting
 1. Verify port is open: test from bastion with `nc -zv -w 5 <ip> 8443`
@@ -475,6 +318,11 @@ kubectl --context $K8S_CONTEXT exec bastion-pod -- rm -f /root/.ssh/known_hosts
 5. v2rayNG is not in Russian Play Store - download APK from GitHub: `https://github.com/2dust/v2rayNG/releases`
 6. v2raytun is available on Google Play: `https://play.google.com/store/apps/details?id=com.v2raytun.android`
 7. Alternative Android clients: Hiddify, NekoBox
+
+### Slow speeds from Russia
+1. Try changing `vless_dest_domain` to a different SNI and recreate instance
+2. Force a new IP: `terraform taint oci_core_public_ip.mtproxy_reserved_ip && terraform apply`
+3. If all fails, consider Shadowsocks or WireGuard
 
 ---
 
@@ -491,15 +339,6 @@ Unlike traditional TLS proxies that use fake certificates, Reality:
 1. Uses the actual TLS certificate of a legitimate website (e.g., microsoft.com)
 2. Performs server-side TLS handshake impersonation
 3. DPI sees traffic that looks identical to legitimate HTTPS
-
-### Advantages Over MTProxy
-
-| Feature | MTProxy | VLESS + Reality |
-|---------|---------|-----------------|
-| Protocol | Telegram-specific | Universal (any TCP/UDP) |
-| Detection | Detectable by traffic patterns | Very hard to detect |
-| Use cases | Telegram only | Any app/browser |
-| Setup | Simpler | More complex |
 
 ### Current Configuration
 
@@ -524,14 +363,7 @@ Russian DPI (TSPU - Technical System for Countering Threats) works differently t
 | Has specific IP ranges | Uses ISP's own infrastructure |
 | Can be blocked by IP | Cannot be blocked by IP |
 
-The solution is protocol-level evasion (fake-TLS, anti-replay), not IP blocking.
-
-### Current Defenses
-- Fake-TLS with Russian/CDN domains (MTProxy)
-- Anti-replay protection (MTProxy)
-- IP blocklist for known scanners (MTProxy)
-- Domain fronting (invalid connections forwarded to real domain)
-- VLESS + Reality (universal proxy, near-undetectable TLS masquerading)
+The solution is protocol-level evasion (Reality TLS masquerading), not IP blocking.
 
 ---
 
@@ -545,8 +377,6 @@ The solution is protocol-level evasion (fake-TLS, anti-replay), not IP blocking.
 
 | Port | Service | Protocol |
 |------|---------|----------|
-| 443 | MTProxy primary | MTProto fake-TLS |
-| 9443 | MTProxy secondary | MTProto fake-TLS |
 | 8443 | VLESS + Reality | VLESS over Reality TLS |
 | 8080 | Subscription server | HTTP (nginx, secret token path) |
 
