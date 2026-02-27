@@ -113,10 +113,6 @@ runcmd:
     # Base64 encode for subscription body
     SUB_BODY=$(echo -n "$VLESS_LINK" | base64 -w 0)
 
-    # Telegram-only routing: proxy for Telegram, direct for everything else
-    ROUTING_JSON='{"domainStrategy":"IPIfNonMatch","rules":[{"type":"field","domain":["geosite:telegram"],"outboundTag":"proxy"},{"type":"field","ip":["geoip:telegram"],"outboundTag":"proxy"},{"type":"field","port":"0-65535","outboundTag":"direct"}]}'
-    ROUTING_B64=$(echo -n "$ROUTING_JSON" | base64 -w 0)
-
     # Create nginx config for subscription endpoint
     cat > /home/ubuntu/nginx-sub.conf << NGINXCONF
     server {
@@ -125,8 +121,7 @@ runcmd:
 
         location = /sub/${subscription_token} {
             add_header profile-title "OCI VLESS Proxy" always;
-            add_header routing "$ROUTING_B64" always;
-            add_header profile-update-interval "24" always;
+            add_header profile-update-interval "0.17" always;
             return 200 "$SUB_BODY";
         }
 
