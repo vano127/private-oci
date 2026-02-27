@@ -50,7 +50,6 @@ runcmd:
               ],
               "privateKey": "${vless_private_key}",
               "shortIds": [
-                "",
                 "0123456789abcdef"
               ]
             }

@@ -63,11 +63,11 @@ variable "instance_memory_gb" {
 variable "vless_port" {
   description = "VLESS + Reality listening port"
   type        = number
-  default     = 8443
+  default     = 443
 }
 
 variable "vless_dest_domain" {
   description = "Reality destination domain (for SNI and TLS fingerprinting)"
   type        = string
-  default     = "www.microsoft.com"
+  default     = "www.oracle.com"
 }
